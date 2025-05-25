@@ -59,7 +59,7 @@ import { videoQueue, filesHelper, resHelper } from "../utils";
 //   }
 // };
 
-export const createMessage = async (req: Request, res: Response) => {
+const createMessage = async (req: Request, res: Response) => {
   try {
     const { conversationId, senderId, replyMessageId, content } = req.body;
     const files = req.files as Express.Multer.File[];
@@ -83,13 +83,14 @@ export const createMessage = async (req: Request, res: Response) => {
         status: "sent",
         type: "image",
       });
+
       await Attachment.bulkCreate(
         images.map((file) => ({
           messageId: imgMsg.id,
           originalname: file.originalname,
-          url: filesHelper.buildMediaUrl(file.path, file.mimetype),
+          url: encodeURIComponent(file.filename),
           size: file.size,
-          type: file.mimetype,
+          type: "image",
         }))
       );
       createdMessages.push(imgMsg);
@@ -104,12 +105,13 @@ export const createMessage = async (req: Request, res: Response) => {
         status: "sent",
         type: "video",
       });
+
       const attachment = await Attachment.create({
         messageId: videoMsg.id,
         originalname: file.originalname,
-        url: filesHelper.buildMediaUrl(file.path, file.mimetype),
+        url: encodeURIComponent(file.filename),
         size: file.size,
-        type: file.mimetype,
+        type: "video",
       });
       try {
         await videoQueue.addToQueue({
@@ -119,7 +121,6 @@ export const createMessage = async (req: Request, res: Response) => {
         });
       } catch (err) {
         console.error("Queue add error:", err);
-        // Có thể log DB hoặc đánh dấu message trạng thái "queue_failed"
       }
 
       createdMessages.push(videoMsg);
@@ -137,8 +138,8 @@ export const createMessage = async (req: Request, res: Response) => {
       await Attachment.create({
         messageId: docMsg.id,
         originalname: file.originalname,
-        url: filesHelper.buildMediaUrl(file.path, file.mimetype),
-        type: file.mimetype,
+        url: encodeURIComponent(file.filename),
+        type: "document",
         size: file.size,
       });
       createdMessages.push(docMsg);
@@ -157,8 +158,9 @@ export const createMessage = async (req: Request, res: Response) => {
       createdMessages.push(textMsg);
     }
 
-    const fullMessages = await Message.findAll({
-      where: { id: createdMessages.map((m) => m.id) },
+    const createdMessageIds = createdMessages.map((m) => m.id);
+    const fullMessagesRaw = await Message.findAll({
+      where: { id: createdMessageIds },
       include: [
         { model: User, as: "sender", attributes: ["id", "displayName", "avatar", "firstName", "lastName"] },
         { model: Attachment, as: "attachments", attributes: ["id", "originalname", "url", "type", "size"] },
@@ -167,11 +169,13 @@ export const createMessage = async (req: Request, res: Response) => {
           as: "replyMessage",
           include: [
             { model: User, as: "sender", attributes: ["id", "displayName", "avatar", "firstName", "lastName"] },
+            { model: Attachment, as: "attachments", attributes: ["id", "originalname", "url", "type", "size"] },
           ],
         },
       ],
-      order: [["createdAt", "ASC"]],
     });
+
+    const fullMessages = createdMessageIds.map((id) => fullMessagesRaw.find((msg) => msg.id === id));
 
     const members = await ConversationMember.findAll({ where: { conversationId }, attributes: ["userId"] });
     const memberIds = members.map((m) => m.userId);
@@ -182,9 +186,10 @@ export const createMessage = async (req: Request, res: Response) => {
       wss.clients.forEach((client: any) => {
         if (client.readyState === client.OPEN && memberIds.includes(client.userId)) {
           fullMessages.forEach((msg) => {
-            client.send(
-              JSON.stringify({ type: "NEW_MESSAGE", data: msg, fromSelf: client.socketId === senderSocketId })
-            );
+            if (msg)
+              client.send(
+                JSON.stringify({ type: "NEW_MESSAGE", data: msg, fromSelf: client.socketId === senderSocketId })
+              );
           });
         }
       });
@@ -199,7 +204,7 @@ export const createMessage = async (req: Request, res: Response) => {
   }
 };
 
-export const getMessagesByConversationId = async (req: Request, res: Response) => {
+const getMessagesByConversationId = async (req: Request, res: Response) => {
   try {
     const { conversationId } = req.params;
 
@@ -217,6 +222,7 @@ export const getMessagesByConversationId = async (req: Request, res: Response) =
           as: "replyMessage",
           include: [
             { model: User, as: "sender", attributes: ["id", "displayName", "avatar", "firstName", "lastName"] },
+            { model: Attachment, as: "attachments", attributes: ["id", "originalname", "url", "type", "size"] },
           ],
         },
       ],
@@ -234,7 +240,7 @@ export const getMessagesByConversationId = async (req: Request, res: Response) =
   }
 };
 
-export const updateMessage = async (req: Request, res: Response) => {
+const updateMessage = async (req: Request, res: Response) => {
   try {
     const { messageId } = req.params;
     const { content } = req.body;
@@ -261,7 +267,7 @@ export const updateMessage = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteMessage = async (req: Request, res: Response) => {
+const deleteMessage = async (req: Request, res: Response) => {
   try {
     const { messageId } = req.params;
 

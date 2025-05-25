@@ -20,7 +20,6 @@ const otpRegisterValidation = async (req: Request, res: Response, next: NextFunc
     res.locals.email = email;
     next();
   } catch (error: any) {
-    console.log("otpRegisterValidation", error);
     return res.status(500).send(resHelper.error(500, "Internal Server Error"));
   }
 };
@@ -66,8 +65,6 @@ const registerValidation = async (req: Request, res: Response, next: NextFunctio
     res.locals.data = data;
     next();
   } catch (error: any) {
-    console.log("registerValidation", error);
-
     return res.status(500).send(resHelper.error(500, "Internal Server Error"));
   }
 };

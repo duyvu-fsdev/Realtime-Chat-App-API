@@ -98,8 +98,6 @@ const userLogin = async (req: Request, res: Response): Promise<Response> => {
         resHelper.success(200, "Login successfully", { refreshToken, accessToken: { token: accessToken, expiresOn } })
       );
   } catch (error) {
-    console.log("userLogin", error);
-
     const message = error instanceof Error ? error.message : "Unknown error";
     return res.status(500).send(resHelper.error(500, "Internal Server Error", message));
   }

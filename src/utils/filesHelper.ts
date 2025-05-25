@@ -26,7 +26,9 @@ const processFiles = async (files: Express.Multer.File[], userId: number) => {
       const outputPath = path.join(dir, newFilename);
       await pipeline(
         fs.createReadStream(file.path),
-        sharp().resize({ width: 1280, height: 1280, fit: "inside" }).webp({ quality: 80 }),
+        sharp()
+          // .resize({ width: 1280, height: 1280, fit: "inside" })
+          .webp({ quality: 80 }),
         fs.createWriteStream(outputPath)
       );
       await fsPromises.unlink(file.path);

@@ -66,7 +66,7 @@ const worker = new Worker(
 
     const attachment = await Attachment.findByPk(attachmentId);
     if (attachment) {
-      attachment.url = outputPath.replace("uploads/", "");
+      attachment.url = encodeURIComponent(newFilename);
       attachment.size = (await fsPromises.stat(outputPath)).size;
       await attachment.save();
     }

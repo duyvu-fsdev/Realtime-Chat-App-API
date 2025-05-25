@@ -33,7 +33,6 @@ app.get("/", (req: Request, res: Response) => {
 initWebSocket(server);
 
 // connect to database
-
 (async () => {
   try {
     await sequelize.authenticate();

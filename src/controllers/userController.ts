@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
 import { literal, Op } from "sequelize";
 import * as xlsx from "xlsx";
-import { User } from "../db/models";
+import { Relationship, User } from "../db/models";
 import { IUser } from "../db/models/user";
 import { passwordHelper, resHelper } from "../utils";
+import e from "cors";
 
 const getUsers = async (req: Request, res: Response): Promise<Response> => {
   try {
@@ -69,12 +70,104 @@ const getUsers = async (req: Request, res: Response): Promise<Response> => {
 //   }
 // };
 
+// const getUserById = async (req: Request, res: Response): Promise<Response> => {
+//   try {
+//    const myId =  res.locals.id ;
+//     const id = req.params?.id as unknown as number;
+//     const user = await User.findByPk(id, { raw: true, attributes: { exclude: ["password"] } });
+//     if (!user) return res.status(404).send(resHelper.error(404, "Not Found", "User does not exist !"));
+//     return res.status(200).send(resHelper.success(200, "Ok", { ...user, avatar: user.avatar ?? "avatar-default.png" }));
+//   } catch (error) {
+//     const message = error instanceof Error ? error.message : "Unknown error";
+//     return res.status(500).send(resHelper.error(500, "Internal Server Error", message));
+//   }
+// };
+
+// const getUserById = async (req: Request, res: Response): Promise<Response> => {
+//   try {
+//     const myId = res.locals.id as number;
+//     const userId = parseInt(req.params?.id);
+//     const user = await User.findByPk(userId, {
+//       raw: true,
+//       attributes: { exclude: ["password"] },
+//     });
+
+//     if (!user) return res.status(404).send(resHelper.error(404, "Not Found", "User does not exist!"));
+
+//     const [user1, user2] = myId < userId ? [myId, userId] : [userId, myId];
+
+//     const relationship = await Relationship.findOne({
+//       where: { user1, user2 },
+//       raw: true,
+//     });
+
+//     let relationshipInfo;
+
+//     if (relationship) {
+//       if (relationship.user1 == myId) {
+//         relationshipInfo = {
+//           status: relationship.status,
+//           initiatorId: relationship.initiatorId,
+//           blockedBy: relationship.blockedBy,
+//           following: relationship.user1IsFollowing,
+//           isTargetFollowing_: relationship.user2IsFollowing,
+//         };
+//       } else {
+//         relationshipInfo = {
+//           status: relationship.status,
+//           initiatorId: relationship.initiatorId,
+//           blockedBy: relationship.blockedBy,
+//           following: relationship.user2IsFollowing,
+//           isTargetFollowing_: relationship.user1IsFollowing,
+//         };
+//       }
+//     } else {
+//       relationshipInfo = null;
+//     }
+
+//     return res
+//       .status(200)
+//       .send(
+//         resHelper.success(200, "Ok", {
+//           ...user,
+//           avatar: user.avatar ?? "avatar-default.png",
+//           relationship: relationshipInfo,
+//         })
+//       );
+//   } catch (error) {
+//     const message = error instanceof Error ? error.message : "Unknown error";
+//     return res.status(500).send(resHelper.error(500, "Internal Server Error", message));
+//   }
+// };
+
 const getUserById = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const id = req.params?.id as unknown as number;
-    const user = await User.findByPk(id, { raw: true, attributes: { exclude: ["password"] } });
-    if (!user) return res.status(404).send(resHelper.error(404, "Not Found", "User does not exist !"));
-    return res.status(200).send(resHelper.success(200, "Ok", { ...user, avatar: user.avatar ?? "avatar-default.png" }));
+    const myId = res.locals.id as number;
+    const userId = parseInt(req.params?.id);
+    const user = await User.findByPk(userId, {
+      raw: true,
+      attributes: { exclude: ["password"] },
+    });
+    if (!user) return res.status(404).send(resHelper.error(404, "Not Found", "User does not exist!"));
+    const [user1, user2] = myId < userId ? [myId, userId] : [userId, myId];
+    const relationship = await Relationship.findOne({ where: { user1, user2 }, raw: true });
+    const isUser1 = relationship?.user1 === myId;
+    const relationshipInfo = relationship
+      ? {
+          status: relationship.status,
+          blockedBy: relationship.blockedBy,
+          isFollowingTarget: isUser1 ? relationship.user1IsFollowing : relationship.user2IsFollowing,
+          isTargetFollowing: isUser1 ? relationship.user2IsFollowing : relationship.user1IsFollowing,
+          isRequestSender: relationship.initiatorId === myId,
+        }
+      : null;
+    return res.status(200).send(
+      resHelper.success(200, "Ok", {
+        ...user,
+        avatar: user.avatar ?? "avatar-default.png",
+        relationship: relationshipInfo,
+      })
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return res.status(500).send(resHelper.error(500, "Internal Server Error", message));

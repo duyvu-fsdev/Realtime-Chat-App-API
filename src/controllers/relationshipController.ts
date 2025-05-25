@@ -1,27 +1,49 @@
-// import { Request, Response } from "express";
-// import { Op, Sequelize } from "sequelize";
-// import {  User } from "../db/models";
-// import { resHelper } from "../utils";
+import { Request, Response } from "express";
+import { Op, Sequelize } from "sequelize";
+import { Relationship, User } from "../db/models";
+import { resHelper } from "../utils";
 
-// const sendFriendRequest = async (req: Request, res: Response) => {
-//   try {
-//     const { userId, targetId } = req.body;
-//     if (userId === targetId) return res.status(400).json({ error: "Không thể gửi kết bạn cho chính mình" });
-//     const existingConnection = await Connection.findOne({ where: { userId, targetId } });
-//     if (existingConnection) return res.status(400).json({ error: "Yêu cầu đã tồn tại" });
-//     const newConnection = await Connection.create({ userId, targetId, status: "pending" });
-//     res.status(201).json(newConnection);
-//   } catch (error) {
-//     const message = error instanceof Error ? error.message : "Unknown error";
-//     return res.status(500).send(resHelper.error(500, "Internal Server Error", message));
-//   }
-// };
+const sendFriendRequest = async (req: Request, res: Response) => {
+  try {
+    const myId = res.locals.id as number;
+    const { userId } = req.body;
+
+    console.log(myId, userId);
+
+    if (myId === userId) return res.status(400).json({ error: "Không thể gửi kết bạn cho chính mình" });
+    const [user1, user2] = myId < userId ? [myId, userId] : [userId, myId];
+    const targetUser = await User.findByPk(userId);
+    if (!targetUser) return res.status(404).json({ error: "Người dùng không tồn tại" });
+    const existingRelationship = await Relationship.findOne({ where: { user1, user2 } });
+    if (existingRelationship && !["blocked", "pending"].includes(existingRelationship.status)) {
+      existingRelationship.status = "pending";
+      existingRelationship.initiatorId = myId;
+      if (myId === existingRelationship.user1) existingRelationship.user1IsFollowing = true;
+      else existingRelationship.user2IsFollowing = true;
+      await existingRelationship.save();
+      return res.status(200).json(existingRelationship);
+    } else {
+      const newRelationship = await Relationship.create({
+        initiatorId: myId,
+        user1,
+        user2,
+        user1IsFollowing: myId === user1,
+        user2IsFollowing: myId === user2,
+        status: "pending",
+      });
+      res.status(201).json(newRelationship);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).send(resHelper.error(500, "Internal Server Error", message));
+  }
+};
 
 // const acceptFriendRequest = async (req: Request, res: Response) => {
 //   try {
 //     const { userId, targetId } = req.body;
 
-//     const connection = await Connection.findOne({
+//     const connection = await Relationship.findOne({
 //       where: { targetId, userId, status: "pending" },
 //     });
 
@@ -42,7 +64,7 @@
 //   try {
 //     const { userId, targetId } = req.body;
 
-//     const connection = await Connection.findOne({
+//     const connection = await Relationship.findOne({
 //       where: { userId, targetId, status: "pending" },
 //     });
 
@@ -63,7 +85,7 @@
 //   try {
 //     const { userId, targetId } = req.body;
 
-//     const connection = await Connection.findOne({
+//     const connection = await Relationship.findOne({
 //       where: {
 //         [Op.or]: [
 //           { userId, targetId, status: "accepted" },
@@ -89,7 +111,7 @@
 //   try {
 //     const { userId, targetId } = req.body;
 
-//     const existingBlock = await Connection.findOne({
+//     const existingBlock = await Relationship.findOne({
 //       where: { userId, targetId, status: "blocked" },
 //     });
 
@@ -97,7 +119,7 @@
 //       return res.status(400).json({ error: "Đã chặn người này rồi" });
 //     }
 
-//     await Connection.upsert({
+//     await Relationship.upsert({
 //       userId,
 //       targetId,
 //       status: "blocked",
@@ -114,7 +136,7 @@
 //   try {
 //     const { userId, targetId } = req.body;
 
-//     const connection = await Connection.findOne({
+//     const connection = await Relationship.findOne({
 //       where: { userId, targetId, status: "blocked" },
 //     });
 
@@ -135,7 +157,7 @@
 //   try {
 //     const { userId } = req.params;
 
-//     const friends = await Connection.findAll({
+//     const friends = await Relationship.findAll({
 //       where: {
 //         [Op.or]: [
 //           { userId, status: "accepted" },
@@ -165,13 +187,13 @@
 //   }
 // };
 
-// export default {
-//   sendFriendRequest,
-//   acceptFriendRequest,
-//   cancelFriendRequest,
-//   unfriend,
-//   blockUser,
-//   unblockUser,
-//   getFriends,
-//   suggestFriends,
-// };
+export default {
+  sendFriendRequest,
+  //   acceptFriendRequest,
+  //   cancelFriendRequest,
+  //   unfriend,
+  //   blockUser,
+  //   unblockUser,
+  //   getFriends,
+  //   suggestFriends,
+};

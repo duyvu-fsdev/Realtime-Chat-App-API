@@ -6,6 +6,7 @@ import {
   conversationController,
   messageController,
   attachmentController,
+  relationshipController,
 } from "../controllers";
 import multer from "multer";
 import imgController from "../controllers/mediaController";
@@ -66,6 +67,19 @@ router.patch("/message/:id", authenticated, checkRole(["user"]), messageControll
 router.delete("/message/:id", authenticated, checkRole(["user"]), messageController.deleteMessage);
 
 // attachment routes
-router.get("/attachment/:msgId", authenticated, checkRole(["user"]), attachmentController.getAttachmentByMsgId);
+router.get(
+  "/attachment/:cvsId/:msgId/:type/:filename",
+  authenticated,
+  checkRole(["user"]),
+  attachmentController.accessFile
+);
+
+// relationship routes
+router.post(
+  "/relationship/friend-request",
+  authenticated,
+  checkRole(["user"]),
+  relationshipController.sendFriendRequest
+);
 
 export default router;
